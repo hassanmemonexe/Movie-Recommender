@@ -1,3 +1,4 @@
+import streamlit as st
 import pandas as pd
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
@@ -5,23 +6,29 @@ from sklearn.metrics.pairwise import cosine_similarity
 # ---------------------------------------------------------
 # 1. Load Dataset
 # ---------------------------------------------------------
-movies = pd.read_csv("movies.csv")   # make sure file is in same folder
-movies = movies[['title', 'overview']]
-movies.dropna(inplace=True)
+@st.cache_data
+def load_data():
+    movies = pd.read_csv("movies.csv")  # Ensure movies.csv is in same folder
+    movies = movies[['title', 'overview']]
+    movies.dropna(inplace=True)
+    return movies
+
+movies = load_data()
 
 # ---------------------------------------------------------
-# 2. Convert Overview Text → TF-IDF Vectors
+# 2. TF-IDF Vectorization
 # ---------------------------------------------------------
-tfidf = TfidfVectorizer(stop_words='english')
-tfidf_matrix = tfidf.fit_transform(movies['overview'])
+@st.cache_data
+def compute_tfidf(movies):
+    tfidf = TfidfVectorizer(stop_words='english')
+    tfidf_matrix = tfidf.fit_transform(movies['overview'])
+    similarity = cosine_similarity(tfidf_matrix)
+    return similarity
+
+similarity = compute_tfidf(movies)
 
 # ---------------------------------------------------------
-# 3. Compute Cosine Similarity Matrix
-# ---------------------------------------------------------
-similarity = cosine_similarity(tfidf_matrix)
-
-# ---------------------------------------------------------
-# 4. Recommendation Function
+# 3. Recommendation Function
 # ---------------------------------------------------------
 def recommend(movie_name):
     movie_name = movie_name.strip()
@@ -32,22 +39,29 @@ def recommend(movie_name):
     index = movies[movies['title'] == movie_name].index[0]
     distances = similarity[index]
 
-    # sort all movies based on similarity score
     movie_list = sorted(
         list(enumerate(distances)),
         reverse=True,
         key=lambda x: x[1]
-    )[1:6]    # skip the first (same movie)
+    )[1:6]  # skip the selected movie itself
 
-    recommendations = []
-    for i in movie_list:
-        recommendations.append(movies.iloc[i[0]].title)
-
+    recommendations = [movies.iloc[i[0]].title for i in movie_list]
     return recommendations
 
 # ---------------------------------------------------------
-# 5. Test (optional)
+# 4. Streamlit UI
 # ---------------------------------------------------------
-if __name__ == "__main__":
-    print("Example Recommendations for 'Avatar':")
-    print(recommend("Avatar"))
+st.set_page_config(page_title="Movie Recommendation System", layout="centered")
+st.title("🎬 Movie Recommendation System")
+st.write("Select a movie and get recommendations based on similarity.")
+
+movie_name = st.selectbox(
+    "Choose a movie",
+    movies['title'].values
+)
+
+if st.button("Recommend Movies"):
+    st.subheader("Recommended Movies:")
+    recommendations = recommend(movie_name)
+    for m in recommendations:
+        st.write("✔️ " + m)
