@@ -8,7 +8,7 @@ from sklearn.metrics.pairwise import cosine_similarity
 # ---------------------------------------------------------
 @st.cache_data
 def load_data():
-    movies = pd.read_csv("movies.csv")  # Ensure movies.csv is in same folder
+    movies = pd.read_csv("tmdb_5000_movies.csv")  # Ensure movies.csv is in same folder
     movies = movies[['title', 'overview']]
     movies.dropna(inplace=True)
     return movies
