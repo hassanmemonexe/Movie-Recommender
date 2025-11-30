@@ -2,29 +2,40 @@ import streamlit as st
 import pandas as pd
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
+import os
 
 # ---------------------------------------------------------
-# 1. Load Dataset
-# Dataset must have: title, overview, poster_path, imdb_id
-# poster_path is TMDB poster path, imdb_id is IMDb code
+# 1. Load & Clean Dataset
 # ---------------------------------------------------------
 @st.cache_data
-def load_data():
-    movies = pd.read_csv("tmdb_5000_movies.csv")
-    movies = movies[['title', 'overview', 'poster_path', 'imdb_id']]
-    movies.dropna(inplace=True)
+def load_and_clean_data():
+    if not os.path.exists("movies_clean.csv"):
+        # Load original dataset
+        movies = pd.read_csv("tmdb_5000_movies.csv")
+        
+        # Keep only required columns
+        movies = movies[['title', 'overview', 'poster_path', 'imdb_id']]
+        
+        # Drop missing values
+        movies.dropna(subset=['title', 'overview', 'poster_path', 'imdb_id'], inplace=True)
+        
+        # Save cleaned CSV for future runs
+        movies.to_csv("movies_clean.csv", index=False)
+    else:
+        movies = pd.read_csv("movies_clean.csv")
     return movies
 
-movies = load_data()
+movies = load_and_clean_data()
 
 # ---------------------------------------------------------
-# 2. TF-IDF Vectorization & Cosine Similarity
+# 2. TF-IDF Vectorization & Similarity
 # ---------------------------------------------------------
 @st.cache_data
 def compute_similarity(movies):
     tfidf = TfidfVectorizer(stop_words='english')
     tfidf_matrix = tfidf.fit_transform(movies['overview'])
-    return cosine_similarity(tfidf_matrix)
+    similarity = cosine_similarity(tfidf_matrix)
+    return similarity
 
 similarity = compute_similarity(movies)
 
