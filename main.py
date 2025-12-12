@@ -146,8 +146,8 @@ def recommend(movie_name):
 # ---------------------------------------------------------
 st.set_page_config(page_title="Movie Recommender", layout="wide")
 
-st.title("🎬 Simple Movie Recommender")
-st.write("Browse movies based on plot, genres, and keywords.")
+st.title("🎬 Movie Recommender")
+st.write("Browse movies based on genres, and selected movies.")
 
 # --- GENRE FILTER ---
 unique_genres = []
