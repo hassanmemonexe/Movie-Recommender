@@ -18,11 +18,12 @@ def load_data():
     movies = pd.read_csv("tmdb_5000_movies.csv")
     
     all_tags = []
+    all_genres_for_ui = [] # New list to store readable genres for the filter
     
-    # Process each movie to create a unified 'tags' feature
+    # Process each movie
     for i in range(len(movies)):
         
-        # Parse stringified lists (e.g., "['Action', 'Comedy']")
+        # Parse stringified lists
         genres_list = eval(movies['genres'][i]) 
         keywords_list = eval(movies['keywords'][i])
         
@@ -32,29 +33,36 @@ def load_data():
             overview = ""
         
         # Extract genre names
-        my_genres = []
+        # We need two versions: 
+        # 1. 'tag_genres' (with underscores) for the Machine Learning model
+        # 2. 'ui_genres' (normal text) for the User Interface dropdown
+        tag_genres = []
+        ui_genres = []
+        
         for item in genres_list:
-            # Replace spaces with underscores for single-token handling
-            name = item['name'].replace(" ", "_")
-            my_genres.append(name)
+            name = item['name']
+            ui_genres.append(name) # Save "Science Fiction"
+            tag_genres.append(name.replace(" ", "_")) # Save "Science_Fiction"
             
         # Extract keyword names
-        my_keywords = []
+        tag_keywords = []
         for item in keywords_list:
             name = item['name'].replace(" ", "_")
-            my_keywords.append(name)
+            tag_keywords.append(name)
         
-        # Create tag string
-        genre_str = " ".join(my_genres)
-        keyword_str = " ".join(my_keywords)
+        # Create tag string for the model
+        genre_str = " ".join(tag_genres)
+        keyword_str = " ".join(tag_keywords)
         full_tag = overview + " " + genre_str + " " + keyword_str
         
         all_tags.append(full_tag)
+        all_genres_for_ui.append(ui_genres)
 
     movies['tags'] = all_tags
+    movies['genres_ui'] = all_genres_for_ui # Save the list of genres for filtering
     
-    # Select relevant columns and clean missing values
-    movies = movies[['id', 'title', 'tags']]
+    # Select relevant columns
+    movies = movies[['id', 'title', 'tags', 'genres_ui']]
     movies.dropna(inplace=True)
     movies.reset_index(drop=True, inplace=True)
     
@@ -67,7 +75,7 @@ movies = load_data()
 # ---------------------------------------------------------
 @st.cache_data
 def compute_similarity(movies):
-    # Initialize TF-IDF Vectorizer (remove English stop words)
+    # Initialize TF-IDF Vectorizer
     tfidf = TfidfVectorizer(stop_words='english')
     
     # Generate TF-IDF matrix from 'tags'
@@ -156,21 +164,60 @@ def recommend(movie_name):
 # ---------------------------------------------------------
 # 5. UI INTERFACE
 # ---------------------------------------------------------
-st.title("🎬 Movie Recommender")
-st.write("Browse movies based on plot, genres, and keywords.")
+st.set_page_config(page_title="Movie Recommender", layout="wide")
 
-selected_movie = st.selectbox("Pick a movie:", movies['title'].values)
+st.title("🎬 Movie Recommender")
+st.write("Get movie suggestions based on your previous selection and genres.")
+
+# --- NEW: GENRE FILTER LOGIC ---
+
+# 1. Get a list of all unique genres exist in our data
+unique_genres = []
+for genre_list in movies['genres_ui']:
+    for genre in genre_list:
+        if genre not in unique_genres:
+            unique_genres.append(genre)
+
+unique_genres.sort() # Sort alphabetically
+
+# 2. Add "All Genres" option at the start
+genre_options = ["All Genres"] + unique_genres
+
+# 3. Create the Genre Dropdown
+selected_genre = st.selectbox("Filter by Genre:", genre_options)
+
+# 4. Filter the movie list based on selection
+filtered_movie_titles = []
+
+if selected_genre == "All Genres":
+    # Show everything
+    filtered_movie_titles = movies['title'].values
+else:
+    # Loop through and only pick movies that have the selected genre
+    for i in range(len(movies)):
+        if selected_genre in movies['genres_ui'][i]:
+            filtered_movie_titles.append(movies['title'][i])
+
+# --- END NEW LOGIC ---
+
+# Use the FILTERED list for the movie dropdown
+selected_movie = st.selectbox("Pick a movie:", filtered_movie_titles)
 
 if st.button("Recommend"):
     names, posters, links = recommend(selected_movie)
     
     if names:
-        st.header("Top 5 Recommendations:")
+        st.subheader(f"Because you liked '{selected_movie}':")
         
         cols = st.columns(5)
         
         for i in range(5):
             with cols[i]:
-                st.image(posters[i], use_container_width=True)
-                st.write(f"**{names[i]}**")
-                st.markdown(f"[View on IMDb]({links[i]})")
+                # HTML code to make image clickable with styling
+                html_code = f"""
+                    <a href="{links[i]}" target="_blank">
+                        <img src="{posters[i]}" style="width:100%; border-radius:10px; margin-bottom: 10px;">
+                    </a>
+                    <div style="text-align:center;"><b>{names[i]}</b></div>
+                """
+                st.markdown(html_code, unsafe_allow_html=True)
